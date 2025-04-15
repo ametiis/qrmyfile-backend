@@ -5,10 +5,11 @@ const {
   listMissions,
   getMission,
   deleteMission,
+  claimMission,
+  rejectMission,
   acceptMission,
-  submitProof,
-  validateMission,
-  markAsPaid,
+  completeMission,
+  confirmMission,
   promoteMission
 } = require('../controllers/missionController');
 const authenticate = require('../middleware/authenticate');
@@ -18,12 +19,13 @@ router.get('/', listMissions);           // Lister les missions
 router.get('/:id', getMission);          // Voir les détails d'une mission
 
 // 🔐 Routes protégées
-router.post('/', authenticate, createMission);                        // Créer une mission
+router.post('/createMission', authenticate, createMission);                  // Créer une mission
 router.delete('/:id', authenticate, deleteMission);                  // Supprimer sa propre mission
-router.post('/:id/accept', authenticate, acceptMission);            // Accepter une mission
-router.post('/:id/proof', authenticate, submitProof);               // Soumettre une preuve
-router.post('/:id/validate', authenticate, validateMission);        // Valider la mission
-router.post('/:id/paid', authenticate, markAsPaid);                 // Marquer comme payée
+router.post('/:id/claim', authenticate, claimMission);              // Se proposer pour une mission
+router.post('/:id/reject', authenticate, rejectMission);            // L'utilisateur peut rejeter un jockey
+router.post('/:id/accept', authenticate, acceptMission);            // L'utilisateur peut accepter un jockey
+router.post('/:id/complete', authenticate, completeMission);               // Soumettre une preuve
+router.post('/:id/confirm', authenticate, confirmMission);        // Confirmer la mission
 router.post('/:id/promote', authenticate, promoteMission);         // Mettre en avant la mission
 
 module.exports = router;

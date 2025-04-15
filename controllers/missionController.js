@@ -2,24 +2,25 @@ const pool = require('../db');
 
 const MISSION_STATUS = {
     OPEN: 'open',
+    CLAIMED: 'claimed',
     ACCEPTED: 'accepted',
-    WAITING_VALIDATION: 'waiting_validation',
-    VALIDATED: 'validated',
-    PAID: 'paid'
+    COMPLETED: 'completed',
+    CONFIRMED:"confirmed",
+    
   };
 
 // Créer une mission
 const createMission = async (req, res) => {
   const userId = req.user.id;
-  const { title, description, price, location, distance_km, proof_type,premium } = req.body;
+  const { title, description, price, location, distance_km, type, proof_type,premium,deadline } = req.body;
 
   try {
     const result = await pool.query(
       `INSERT INTO missions 
-        (user_id, title, description, price, location, distance_km, proof_type, premium)
-       VALUES ($1, $2, $3, $4, $5, $6, $7,$8)
+        (user_id, title, description, price, location, distance_km,type, proof_type, premium,deadline)
+       VALUES ($1, $2, $3, $4, $5, $6, $7,$8, $9, $10)
        RETURNING *`,
-      [userId,title, description, price, location, distance_km, proof_type, premium]
+      [userId,title, description, price, location, distance_km,type, proof_type, premium,deadline]
     );
 
     res.status(201).json(result.rows[0]);
@@ -91,6 +92,19 @@ const deleteMission = async (req, res) => {
   const { id } = req.params;
 
   try {
+
+    const mission = await pool.query(
+      `SELECT * FROM missions WHERE id = $1 AND user_id = $2 AND status = 'open'`,
+      [id, userId]
+    );
+
+    if (mission.rowCount === 0) {
+      return res.status(403).json({
+        error: 'Mission introuvable, non autorisée, ou pas dans un état supprimable',
+      });
+    }
+
+
     const result = await pool.query(`DELETE FROM missions WHERE id = $1 AND user_id = $2 RETURNING *`, [id, userId]);
 
     if (result.rowCount === 0) {
@@ -105,8 +119,8 @@ const deleteMission = async (req, res) => {
 };
 
 
-// Accepter une mission (par le jockey)
-const acceptMission = async (req, res) => {
+// Claim une mission (par le jockey)
+const claimMission = async (req, res) => {
   const jockeyId = req.user.id;
   const { id } = req.params;
 
@@ -121,84 +135,113 @@ const acceptMission = async (req, res) => {
         return res.status(400).json({ error: 'Vous ne pouvez pas accepter votre propre mission' });
       }
 
-    await pool.query(
-      `UPDATE missions SET status = $1, jockey_id = $2, accepted_at = NOW() WHERE id = $3`,
-      [MISSION_STATUS.ACCEPTED, jockeyId, id]
+    const result = await pool.query(
+      `UPDATE missions SET status = $1, jockey_id = $2, claimed_at = NOW() WHERE id = $3  RETURNING *`,
+      [MISSION_STATUS.CLAIMED, jockeyId, id]
+    );
+
+    res.status(201).json(result.rows[0]);
+     
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur lors de la demande' });
+  }
+};
+
+
+// Accepter un Jockey (par l'utilisateur)
+const acceptMission = async (req, res) => {
+  const userId = req.user.id;
+  const { id } = req.params;
+
+  try {
+    const mission = await pool.query(`SELECT * FROM missions WHERE  id = $1 and user_id = $2`, [id,userId]);
+
+    if (mission.rows.length === 0 || mission.rows[0].status !== 'claimed') {
+      return res.status(400).json({ error: 'Mission non disponible' });
+    }
+
+    const result = await pool.query(
+      `UPDATE missions SET status = $1, accepted_at = NOW() WHERE id = $2  RETURNING *`,
+      [MISSION_STATUS.ACCEPTED, id]
     );
      
-
-
-    res.json({ message: 'Mission acceptée' });
+    res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur lors de l’acceptation' });
   }
 };
 
-// Valider une course (par le jockey)
-const submitProof = async (req, res) => {
+// Rejeter un Jockey (par l'utilisateur)
+const rejectMission = async (req, res) => {
+  const userId = req.user.id;
+  const { id } = req.params;
+
+  try {
+    const mission = await pool.query(`SELECT * FROM missions WHERE  id = $1 and user_id = $2`, [id,userId]);
+
+    if (mission.rows.length === 0 || mission.rows[0].status !== 'claimed') {
+      return res.status(400).json({ error: 'Mission non disponible' });
+    }
+
+    const result = await pool.query(
+      `UPDATE missions SET status = $1, claimed_at = null, jockey_id = null WHERE id = $2  RETURNING *`,
+      [MISSION_STATUS.OPEN, id]
+    );
+     
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur lors de l’acceptation' });
+  }
+};
+
+// Complete une mission (par le jockey)
+const completeMission = async (req, res) => {
   const jockeyId = req.user.id;
   const { id } = req.params;
 
   try {
-   const result= await pool.query(
-      `UPDATE missions SET status = $1 WHERE id = $2 AND jockey_id = $3`,
-      [ MISSION_STATUS.WAITING_VALIDATION, id, jockeyId]
+    const mission = await pool.query(`SELECT * FROM missions WHERE id = $1`, [id]);
+
+    if (mission.rows.length === 0 || mission.rows[0].status !== 'accepted') {
+      return res.status(400).json({ error: 'Mission non disponible' });
+    }
+
+
+    const result = await pool.query(
+      `UPDATE missions SET status = $1,  completed_at = NOW() WHERE id = $2  RETURNING *`,
+      [MISSION_STATUS.COMPLETED, id]
     );
 
-    if (result.rowCount === 0) {
-        return res.status(404).json({ error: 'Mission non trouvée ou non autorisée' });
-      }
-
-    res.json({ message: 'Validation demandée' });
+    res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la demande de validation' });
+    res.status(500).json({ error: 'Erreur lors de la demande' });
   }
 };
 
-// Valider une mission (par le créateur)
-const validateMission = async (req, res) => {
+// Terminer une mission (par le créateur)
+const confirmMission = async (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;
 
   try {
    const result =  await pool.query(
-      `UPDATE missions SET status = $1, validated_at = NOW() WHERE id = $2 AND user_id = $3`,
-      [MISSION_STATUS.VALIDATED, id, userId]
+      `UPDATE missions SET status = $1, confirmed_at = NOW() WHERE id = $2 AND user_id = $3  RETURNING *`,
+      [MISSION_STATUS.CONFIRMED, id, userId]
     );
     if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Mission non trouvée ou non autorisée' });
       }
 
-    res.json({ message: 'Mission validée' });
+      res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur lors de la validation' });
   }
 };
-
-// Marquer une mission comme payée
-const markAsPaid = async (req, res) => {
-    const userId = req.user.id;
-    const { id } = req.params;
-  
-    try {
-     const result = await pool.query(
-        `UPDATE missions SET status = $1 WHERE id = $2 AND user_id = $3`,
-        [MISSION_STATUS.PAID,id, userId]
-      );
-
-      if (result.rowCount === 0) {
-        return res.status(404).json({ error: 'Mission non trouvée ou non autorisée' });
-      }
-  
-      res.json({ message: 'Mission payée' });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Erreur lors du paiement' });
-    }
-  };
 
 // Mettre une mission en avant (option premium)
 const promoteMission = async (req, res) => {
@@ -224,8 +267,9 @@ module.exports = {
   getMission,
   deleteMission,
   acceptMission,
-  submitProof,
-  validateMission,
-  markAsPaid,
+  claimMission,
+  rejectMission,
+  completeMission,
+  confirmMission,
   promoteMission,
 };

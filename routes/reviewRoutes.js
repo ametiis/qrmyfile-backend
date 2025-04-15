@@ -3,18 +3,22 @@ const router = express.Router();
 const {
   getUserReviews,
   addReview,
-  deleteReview
+  deleteReview,
+  getMyReviewsMade
 } = require('../controllers/reviewController');
 
 const authenticate = require('../middleware/authenticate');
 
 // Lister les reviews d’un utilisateur (public)
-router.get('/:userId', getUserReviews);
+router.get('/all',authenticate, getMyReviewsMade);
+
+// Lister les reviews d’un utilisateur (public)
+router.get('/:userId', getMyReviewsMade);
 
 // Ajouter une review (authentifié)
 router.post('/', authenticate, addReview);
 
 // Supprimer sa propre review sur un utilisateur (authentifié)
-router.delete('/:reviewedId', authenticate, deleteReview);
+router.delete('/', authenticate, deleteReview);
 
 module.exports = router;

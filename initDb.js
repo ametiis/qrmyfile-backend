@@ -20,20 +20,23 @@ async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS missions (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE ,
         title VARCHAR(255) NOT NULL,
         description TEXT,
         distance_km DECIMAL,
+        type TEXT,
         location VARCHAR(255),
         deadline TIMESTAMP,
         price DECIMAL,
         premium BOOLEAN DEFAULT false,
         status VARCHAR(50) DEFAULT 'open',
-        jockey_id INTEGER REFERENCES users(id),
+        jockey_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         proof_type VARCHAR(50),
         created_at TIMESTAMP DEFAULT NOW(),
+        claimed_at timestamp,
         accepted_at timestamp,
-        validated_at timestamp
+        completed_at timestamp,
+        confirmed_at timestamp
       );
     `);
 
@@ -42,8 +45,8 @@ async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
-        reviewer_id INTEGER REFERENCES users(id),
-        reviewed_id INTEGER REFERENCES users(id),
+        reviewer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         rating INTEGER CHECK (rating BETWEEN 0 AND 5),
         comment TEXT,
         created_at TIMESTAMP DEFAULT NOW()
@@ -54,7 +57,7 @@ async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
-        sender_id INTEGER REFERENCES users(id),
+        sender_id INTEGER REFERENCES users(id) ,
         receiver_id INTEGER REFERENCES users(id),
         content TEXT,
         is_read BOOLEAN DEFAULT false,
@@ -63,7 +66,7 @@ async function initializeDatabase() {
     `);
 
     // PAYMENTS
-    await pool.query(`
+    /*await pool.query(`
       CREATE TABLE IF NOT EXISTS payments (
         id SERIAL PRIMARY KEY,
         mission_id INTEGER REFERENCES missions(id),
@@ -80,11 +83,11 @@ async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS alerts (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER REFERENCES users(id),
+        user_id INTEGER REFERENCES users(id) ON DELETE cascade,
         location VARCHAR(255),
         radius_km DECIMAL
       );
-    `);
+    `);*/
 
     console.log("✅ Toutes les tables ont été créées ou vérifiées.");
   } catch (error) {

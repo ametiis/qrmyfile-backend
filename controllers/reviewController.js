@@ -20,6 +20,28 @@ const getUserReviews = async (req, res) => {
   }
 };
 
+const getMyReviewsMade = async (req, res) => {
+  console.log(req.user);
+  const reviewerId = req.user.id;
+
+  try {
+    const result = await pool.query(
+      `SELECT reviewer_id, rating, comment, created_at
+       FROM reviews
+       WHERE reviewer_id = $1
+       ORDER BY created_at DESC`,
+      [reviewerId]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur lors de la récupération des avis' });
+  }
+};
+
+
+
 // Ajouter une review (une seule fois par utilisateur)
 const addReview = async (req, res) => {
   const reviewerId = req.user.id;
@@ -55,12 +77,12 @@ const addReview = async (req, res) => {
 // Supprimer une review qu’on a rédigée
 const deleteReview = async (req, res) => {
   const reviewerId = req.user.id;
-  const { reviewedId } = req.params;
+  const { reviewed_id } = req.body;
 
   try {
     const result = await pool.query(
       `DELETE FROM reviews WHERE reviewer_id = $1 AND reviewed_id = $2 RETURNING *`,
-      [reviewerId, reviewedId]
+      [reviewerId, reviewed_id]
     );
 
     if (result.rowCount === 0) {
@@ -78,4 +100,5 @@ module.exports = {
   getUserReviews,
   addReview,
   deleteReview,
+  getMyReviewsMade
 };
