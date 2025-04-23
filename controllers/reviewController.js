@@ -1,24 +1,30 @@
 const pool = require('../db');
-
+const { createNotification } = require('./notificationController');
 // Lister les reviews d’un utilisateur donné
+
+
+// Exemple dans getReviewsByUserId
 const getUserReviews = async (req, res) => {
   const { userId } = req.params;
-
   try {
     const result = await pool.query(
-      `SELECT reviewer_id, rating, comment, created_at
-       FROM reviews
-       WHERE reviewed_id = $1
-       ORDER BY created_at DESC`,
+      `
+      SELECT reviews.*, users.username AS reviewer_username
+      FROM reviews
+      JOIN users ON reviews.reviewer_id = users.id
+      WHERE reviews.reviewed_id = $1
+      ORDER BY reviews.created_at DESC
+      `,
       [userId]
     );
 
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la récupération des avis' });
+    console.error("Erreur lors de la récupération des reviews :", err);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 };
+
 
 const getMyReviewsMade = async (req, res) => {
   console.log(req.user);
@@ -66,6 +72,11 @@ const addReview = async (req, res) => {
        VALUES ($1, $2, $3, $4)`,
       [reviewerId, reviewed_id, rating, comment]
     );
+    await createNotification(
+      reviewed_id,
+      "review"
+      
+       );
 
     res.status(201).json({ message: 'Avis ajouté' });
   } catch (err) {
@@ -92,7 +103,7 @@ const deleteReview = async (req, res) => {
     res.json({ message: 'Avis supprimé' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la suppression de l’avis' });
+    res.status(500).json({ error: 'unknown' });
   }
 };
 

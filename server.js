@@ -8,6 +8,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const path = require('path');
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -19,12 +20,16 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/missions', require('./routes/missionRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
 app.use('/api/reviews', require('./routes/reviewRoutes'));
-app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/alerts', require('./routes/alertRoutes'));
+app.use('/api/notifications', require('./routes/notificationsRoutes'));
 
 app.get('/', (req, res) => {
   res.send('JogForMe API is running');
 });
+
+
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.listen(PORT, async () => {
   await initializeDatabase();

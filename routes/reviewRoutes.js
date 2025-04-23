@@ -13,7 +13,7 @@ const authenticate = require('../middleware/authenticate');
 router.get('/all',authenticate, getMyReviewsMade);
 
 // Lister les reviews d’un utilisateur (public)
-router.get('/:userId', getMyReviewsMade);
+router.get('/:userId', getUserReviews);
 
 // Ajouter une review (authentifié)
 router.post('/', authenticate, addReview);

@@ -1,33 +1,62 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../db');
+const { sendContactEmail } = require("./mailer");
 
 // 1. Voir un profil public
 const getUserProfile = async (req, res) => {
   const { id } = req.params;
+
+  const limit = parseInt(req.query.limit) || 10;
+  const offsetJockey = parseInt(req.query.jockeyOffset) || 0;
+  const offsetCreated = parseInt(req.query.missionsOffset) || 0;
   try {
     const userResult = await pool.query(
-      'SELECT id, username, profile_link, premium_until  FROM users WHERE id = $1',
+      "SELECT id, username, profile_link FROM users WHERE id = $1",
       [id]
     );
 
-    if (userResult.rows.length === 0) return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "unknown" });
+    }
 
-    const user = userResult.rows[0];
-
-    const reviewsResult = await pool.query(
-      'SELECT reviewer_id, rating, comment, created_at FROM reviews WHERE reviewed_id = $1',
-      [id]
+    const missionsCreated = await pool.query(
+      `SELECT id, title, status, price, currency, distance_km
+       FROM missions
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [id, limit, offsetCreated]
     );
 
-    const missionsResult = await pool.query(
-      'SELECT * FROM missions WHERE user_id = $1',
-      [id]
+    const missionsAsJockey = await pool.query(
+      `SELECT id, title, status, price, currency, distance_km
+       FROM missions
+       WHERE jockey_id = $1
+       ORDER BY claimed_at DESC
+       LIMIT $2 OFFSET $3`,
+      [id, limit, offsetJockey]
     );
 
-    res.status(200).json({ user, missions:missionsResult.rows, reviews: reviewsResult.rows });
+const totalCreated = await pool.query(
+  `SELECT COUNT(*) FROM missions WHERE user_id = $1`,
+  [id]
+);
+const totalJockey = await pool.query(
+  `SELECT COUNT(*) FROM missions WHERE jockey_id = $1`,
+  [id]
+);
+
+
+    res.json({
+      ...userResult.rows[0],
+      missions: missionsCreated.rows,
+      missions_as_jockey: missionsAsJockey.rows,
+      hasMoreMissions: offsetCreated + limit < parseInt(totalCreated.rows[0].count),
+      hasMoreJockey: offsetJockey + limit < parseInt(totalJockey.rows[0].count),
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Erreur serveur' });
+    console.error("Erreur lors de la récupération du profil", err);
+    res.status(500).json({ error: "unknown" });
   }
 };
 
@@ -55,11 +84,11 @@ const updatePassword = async (req, res) => {
 // 3. Modifier le profil
 const updateProfile = async (req, res) => {
   const userId = req.user.id;
-  const { profile_link, paypal_email, stripe_account_id } = req.body;
+  const { profile_link } = req.body;
   try {
     await pool.query(
-      'UPDATE users SET profile_link = $1, paypal_email = $2, stripe_account_id = $3 WHERE id = $4',
-      [profile_link, paypal_email, stripe_account_id, userId]
+      'UPDATE users SET profile_link = $1 WHERE id = $2',
+      [profile_link, userId]
     );
     res.json({ message: 'Profil mis à jour' });
   } catch (err) {
@@ -124,35 +153,27 @@ const deleteAccount = async (req, res) => {
   }
 };
 
-// 6. Voir mon propre profil 
-const getMyProfile = async (req, res) => {
-  const userId = req.user.id;
+
+
+//6. Envoi d'un mail via le formulaire de contact
+const sendContactMessage = async (req, res) => {
+  const { name, email, message } = req.body;
+
+  if (!email || !message || message.length < 10 || message.length > 1000) {
+    return res.status(400).json({ message: "Message invalide ou trop court." });
+  }
+
   try {
-    const userResult = await pool.query(
-      'SELECT id, username, profile_link, premium_until  FROM users WHERE id = $1',
-      [userId]
-    );
-
-    if (userResult.rows.length === 0) return res.status(404).json({ message: 'Utilisateur non trouvé' });
-
-    const user = userResult.rows[0];
-
-    const reviewsResult = await pool.query(
-      'SELECT reviewer_id, rating, comment, created_at FROM reviews WHERE reviewed_id = $1',
-      [userId]
-    );
-
-    const missionsResult = await pool.query(
-      'SELECT * FROM missions WHERE user_id = $1',
-      [userId]
-    );
-
-    res.status(200).json({ user, missions: missionsResult.rows, reviews: reviewsResult.rows });
+    await sendContactEmail({ name, email, message });
+    res.status(200).json({ message: "Message envoyé avec succès." });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Erreur serveur' });
+    console.error("Erreur envoi mail contact:", err);
+    res.status(500).json({ message: "Erreur lors de l'envoi du message." });
   }
 };
 
 
-module.exports = { getUserProfile, updatePassword, updateProfile, becomePremium, deleteAccount, getMyProfile };
+
+
+
+module.exports = { getUserProfile, updatePassword, updateProfile, becomePremium, deleteAccount, sendContactMessage };

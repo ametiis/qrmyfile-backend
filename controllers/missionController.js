@@ -1,4 +1,5 @@
 const pool = require('../db');
+const { createNotification } = require('./notificationController');
 
 const MISSION_STATUS = {
     OPEN: 'open',
@@ -6,85 +7,152 @@ const MISSION_STATUS = {
     ACCEPTED: 'accepted',
     COMPLETED: 'completed',
     CONFIRMED:"confirmed",
+    EXPIRED:"expired",
     
   };
 
 // Créer une mission
 const createMission = async (req, res) => {
   const userId = req.user.id;
-  const { title, description, price, location, distance_km, type, proof_type,premium,deadline } = req.body;
+  const {
+    title,
+    description,
+    price,
+    longitude,
+    latitude,
+    distance_km,
+    type,
+    deadline,
+    pace, // format attendu : "4:30"
+    currency
+  } = req.body;
+
+  // Vérification de la présence et des types
+  if (
+    typeof title !== "string" || title.trim() === "" ||
+    typeof description !== "string" || description.trim() === "" ||
+    typeof type !== "string" || type.trim() === "" ||
+    typeof price !== "number" || isNaN(price) || price < 0 ||
+    typeof distance_km !== "number" || isNaN(distance_km) || distance_km <= 0 ||
+    typeof longitude !== "number" || typeof latitude !== "number" ||
+    !deadline || isNaN(Date.parse(deadline))
+  ) {
+    return res.status(400).json({ error: "errorCreatingMission" });
+  }
+
+  // Gestion de la vitesse (facultatif)
+  let paceInSeconds = null;
+  if (pace && typeof pace === "string" && /^\d+:\d{2}$/.test(pace)) {
+    const [min, sec] = pace.split(":").map(Number);
+    paceInSeconds = min * 60 + sec;
+  }
 
   try {
     const result = await pool.query(
       `INSERT INTO missions 
-        (user_id, title, description, price, location, distance_km,type, proof_type, premium,deadline)
-       VALUES ($1, $2, $3, $4, $5, $6, $7,$8, $9, $10)
+        (user_id, title, description, price, longitude, latitude, distance_km, type, deadline, pace_seconds_per_km, currency)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11)
        RETURNING *`,
-      [userId,title, description, price, location, distance_km,type, proof_type, premium,deadline]
+      [
+        userId,
+        title.trim(),
+        description.trim(),
+        price,
+        longitude,
+        latitude,
+        distance_km,
+        type.trim(),
+        deadline,
+        paceInSeconds,
+        currency
+      ]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la création de la mission' });
+    res.status(500).json({ error: "unknown" });
   }
 };
 
-// Lister les missions
-const listMissions = async (req, res) => {
-  const { location, status, premium } = req.query;
 
-  let query = `SELECT * FROM missions WHERE 1=1`;
+
+// Lister les missions pour la carte (seulement les missions OPEN)
+const listMissions = async (req, res) => {
+  const { type, minPrice, maxPace, minDist, maxDist, currency } = req.body;
+
+  let query = `SELECT id, latitude, longitude FROM missions WHERE status = 'open' AND 1=1`;
   const params = [];
 
-  console.log(location);
-  if (status && !Object.values(MISSION_STATUS).includes(status)) {
-    return res.status(400).json({ error: 'Statut invalide' });
+  if (type) {
+    params.push(type);
+    query += ` AND type = $${params.length}`;
   }
 
-  if (location) {
-    params.push(location);
-    query += ` AND location = $${params.length}`;
+  if (minPrice) {
+    params.push(minPrice);
+    query += ` AND price >= $${params.length}`;
   }
 
-  if (status) {
-    params.push(status);
-    query += ` AND status = $${params.length}`;
+  if (currency) {
+    params.push(currency);
+    query += ` AND currency = $${params.length}`;
   }
 
-  if (premium) {
-    params.push(premium === 'true');
-    query += ` AND premium = $${params.length}`;
+  if (maxPace) {
+    params.push(maxPace);
+    query += ` AND pace_seconds_per_km >= $${params.length}`;
   }
 
-  query += ` ORDER BY created_at DESC`;
+  if (minDist) {
+    params.push(minDist);
+    query += ` AND distance_km >= $${params.length}`;
+  }
+
+  if (maxDist) {
+    params.push(maxDist);
+    query += ` AND distance_km <= $${params.length}`;
+  }
 
   try {
     const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la récupération des missions' });
+    res.status(500).json({ error: "unknown" });
   }
 };
 
-// Voir les détails d’une mission
+
+
+// Voir les détails d’une mission avec le nom du créateur
 const getMission = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query(`SELECT * FROM missions WHERE id = $1`, [id]);
+    const result = await pool.query(`
+
+      SELECT 
+  missions.*, 
+  creator.username AS creator_username,
+  jockey.username AS jockey_username
+FROM missions
+JOIN users AS creator ON creator.id = missions.user_id
+LEFT JOIN users AS jockey ON jockey.id = missions.jockey_id
+WHERE missions.id = $1
+    `, [id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Mission non trouvée' });
+      return res.status(404).json({ error: 'unknown' });
     }
 
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la récupération de la mission' });
+    res.status(500).json({ error: 'unknown' });
   }
 };
+
 
 // Supprimer une mission
 const deleteMission = async (req, res) => {
@@ -140,6 +208,12 @@ const claimMission = async (req, res) => {
       [MISSION_STATUS.CLAIMED, jockeyId, id]
     );
 
+    await createNotification(
+       mission.rows[0].user_id,
+       "claim",
+       id
+        );
+
     res.status(201).json(result.rows[0]);
      
   } catch (err) {
@@ -160,6 +234,12 @@ const acceptMission = async (req, res) => {
     if (mission.rows.length === 0 || mission.rows[0].status !== 'claimed') {
       return res.status(400).json({ error: 'Mission non disponible' });
     }
+
+    await createNotification(
+       mission.rows[0].jockey_id,
+       "accepted",
+       id
+        );
 
     const result = await pool.query(
       `UPDATE missions SET status = $1, accepted_at = NOW() WHERE id = $2  RETURNING *`,
@@ -184,12 +264,19 @@ const rejectMission = async (req, res) => {
     if (mission.rows.length === 0 || mission.rows[0].status !== 'claimed') {
       return res.status(400).json({ error: 'Mission non disponible' });
     }
+    await createNotification(
+       mission.rows[0].jockey_id,
+       "rejected",
+       id
+        );
 
     const result = await pool.query(
       `UPDATE missions SET status = $1, claimed_at = null, jockey_id = null WHERE id = $2  RETURNING *`,
       [MISSION_STATUS.OPEN, id]
     );
      
+  
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -198,29 +285,45 @@ const rejectMission = async (req, res) => {
 };
 
 // Complete une mission (par le jockey)
-const completeMission = async (req, res) => {
+const completeMissionUpload = async (req, res) => {
   const jockeyId = req.user.id;
   const { id } = req.params;
 
   try {
-    const mission = await pool.query(`SELECT * FROM missions WHERE id = $1`, [id]);
+    const missionRes = await pool.query(`SELECT * FROM missions WHERE id = $1`, [id]);
+    const mission = missionRes.rows[0];
 
-    if (mission.rows.length === 0 || mission.rows[0].status !== 'accepted') {
-      return res.status(400).json({ error: 'Mission non disponible' });
+    if (!mission || mission.status !== 'accepted' || mission.jockey_id !== jockeyId) {
+      return res.status(400).json({ error: 'Mission non disponible ou accès refusé' });
     }
 
+    let gpxFilename = null;
+    if (req.file) {
+      gpxFilename = req.file.filename;
+    }
 
-    const result = await pool.query(
-      `UPDATE missions SET status = $1,  completed_at = NOW() WHERE id = $2  RETURNING *`,
-      [MISSION_STATUS.COMPLETED, id]
+    const updateRes = await pool.query(
+      `UPDATE missions 
+       SET status = $1, completed_at = NOW(), gpx_file = $2
+       WHERE id = $3 RETURNING *`,
+      [MISSION_STATUS.COMPLETED, gpxFilename, id]
     );
 
-    res.status(201).json(result.rows[0]);
+
+    await createNotification(
+       updateRes.rows[0].user_id,
+       MISSION_STATUS.COMPLETED,
+       id
+        );
+
+    res.status(201).json(updateRes.rows[0]);
+    
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la demande' });
+    res.status(500).json({ error: 'Erreur lors de la validation avec fichier' });
   }
 };
+
 
 // Terminer une mission (par le créateur)
 const confirmMission = async (req, res) => {
@@ -236,6 +339,12 @@ const confirmMission = async (req, res) => {
         return res.status(404).json({ error: 'Mission non trouvée ou non autorisée' });
       }
 
+      await createNotification(
+         mission.jockey_id,
+         MISSION_STATUS.CONFIRMED,
+         id
+         );
+
       res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -243,23 +352,37 @@ const confirmMission = async (req, res) => {
   }
 };
 
-// Mettre une mission en avant (option premium)
-const promoteMission = async (req, res) => {
-  const userId = req.user.id;
+const path = require('path');
+
+const uploadGpx = async (req, res) => {
   const { id } = req.params;
+  const userId = req.user.id;
+
+  if (!req.file) {
+    return res.status(400).json({ error: "Fichier GPX manquant" });
+  }
+
+  const gpxPath = `/uploads/${req.file.filename}`;
 
   try {
-    await pool.query(
-      `UPDATE missions SET premium = true WHERE id = $1 AND user_id = $2`,
-      [id, userId]
+    const result = await pool.query(
+      `UPDATE missions SET gpx_file_url = $1 WHERE id = $2 AND jockey_id = $3 RETURNING *`,
+      [gpxPath, id, userId]
     );
 
-    res.json({ message: 'Mission mise en avant' });
+    if (result.rowCount === 0) {
+      return res.status(403).json({ error: "Non autorisé ou mission incorrecte" });
+    }
+
+    res.status(200).json({ message: "Fichier GPX uploadé avec succès", gpxPath });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la mise en avant' });
+    res.status(500).json({ error: "Erreur serveur" });
   }
 };
+
+
+
 
 module.exports = {
   createMission,
@@ -269,7 +392,7 @@ module.exports = {
   acceptMission,
   claimMission,
   rejectMission,
-  completeMission,
+  completeMissionUpload,
   confirmMission,
-  promoteMission,
+  uploadGpx
 };
