@@ -10,7 +10,7 @@ const {
   acceptMission,
   completeMissionUpload,
   confirmMission,
-  promoteMission
+  rejectGpx
 } = require('../controllers/missionController');
 const authenticate = require('../middleware/authenticate');
 const upload = require('../middleware/uploadGpx'); // 👉 important ici
@@ -28,7 +28,7 @@ router.post('/:id/reject', authenticate, rejectMission);            // L'utilisa
 router.post('/:id/accept', authenticate, acceptMission);            // L'utilisateur peut accepter un jockey
 router.post('/:id/complete', authenticate, upload.single('gpxFile'), completeMissionUpload);            // Soumettre une preuve
 router.post('/:id/confirm', authenticate, confirmMission);        // Confirmer la mission
-
+router.post('/:id/reject-gpx', authenticate, rejectGpx);
 
 
 

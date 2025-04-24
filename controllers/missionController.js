@@ -168,7 +168,7 @@ const deleteMission = async (req, res) => {
 
     if (mission.rowCount === 0) {
       return res.status(403).json({
-        error: 'Mission introuvable, non autorisée, ou pas dans un état supprimable',
+        error: 'missionNotDelete',
       });
     }
 
@@ -176,13 +176,13 @@ const deleteMission = async (req, res) => {
     const result = await pool.query(`DELETE FROM missions WHERE id = $1 AND user_id = $2 RETURNING *`, [id, userId]);
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Mission non trouvée ou non autorisée' });
+      return res.status(404).json({ error: 'missionNotDelete' });
     }
 
     res.json({ message: 'Mission supprimée' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la suppression de la mission' });
+    res.status(500).json({ error: 'unknown' });
   }
 };
 
@@ -285,6 +285,7 @@ const rejectMission = async (req, res) => {
 };
 
 // Complete une mission (par le jockey)
+
 const completeMissionUpload = async (req, res) => {
   const jockeyId = req.user.id;
   const { id } = req.params;
@@ -299,7 +300,16 @@ const completeMissionUpload = async (req, res) => {
 
     let gpxFilename = null;
     if (req.file) {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+
+      // Vérifie l'extension
+      if (ext !== '.gpx') {
+        return res.status(400).json({ error: 'invalidFileType' });
+      }
+
       gpxFilename = req.file.filename;
+    } else {
+      return res.status(400).json({ error: 'missingFile' });
     }
 
     const updateRes = await pool.query(
@@ -309,20 +319,65 @@ const completeMissionUpload = async (req, res) => {
       [MISSION_STATUS.COMPLETED, gpxFilename, id]
     );
 
-
     await createNotification(
-       updateRes.rows[0].user_id,
-       MISSION_STATUS.COMPLETED,
-       id
-        );
+      updateRes.rows[0].user_id,
+      MISSION_STATUS.COMPLETED,
+      id
+    );
 
     res.status(201).json(updateRes.rows[0]);
-    
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Erreur lors de la validation avec fichier' });
+    res.status(500).json({ error: 'unknown' });
   }
 };
+
+
+const fs = require('fs');
+const path = require('path');
+
+//rejeter un fichier gpx pour l'utilisateur
+const rejectGpx = async (req, res) => {
+  const userId = req.user.id;
+  const { id } = req.params;
+
+  try {
+    // 1. Vérifie que la mission appartient au user et qu’elle est au statut completed
+    const result = await pool.query(
+      `SELECT * FROM missions WHERE id = $1 AND user_id = $2 AND status = 'completed'`,
+      [id, userId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(403).json({ error: "missionNotFoundOrForbidden" });
+    }
+
+    const mission = result.rows[0];
+
+    // 2. Supprimer le fichier s'il existe
+    if (mission.gpx_file) {
+      const filePath = path.join(__dirname, '..', 'uploads', 'gpx', mission.gpx_file);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    // 3. Remettre le statut à 'accepted' et vider le champ gpx_file
+    await pool.query(
+      `UPDATE missions SET status = 'accepted',completed_at = null, gpx_file = NULL WHERE id = $1`,
+      [id]
+    );
+
+    await createNotification(mission.jockey_id, 'rejected-gpx', id);
+
+    res.json({ message: "gpxRejected" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "unknown" });
+  }
+};
+
 
 
 // Terminer une mission (par le créateur)
@@ -331,55 +386,33 @@ const confirmMission = async (req, res) => {
   const { id } = req.params;
 
   try {
-   const result =  await pool.query(
-      `UPDATE missions SET status = $1, confirmed_at = NOW() WHERE id = $2 AND user_id = $3  RETURNING *`,
+    const result = await pool.query(
+      `UPDATE missions 
+       SET status = $1, confirmed_at = NOW() 
+       WHERE id = $2 AND user_id = $3  
+       RETURNING *`,
       [MISSION_STATUS.CONFIRMED, id, userId]
     );
+
     if (result.rowCount === 0) {
-        return res.status(404).json({ error: 'Mission non trouvée ou non autorisée' });
-      }
+      return res.status(404).json({ error: 'Mission non trouvée ou non autorisée' });
+    }
 
-      await createNotification(
-         mission.jockey_id,
-         MISSION_STATUS.CONFIRMED,
-         id
-         );
+    const mission = result.rows[0]; // ✅ Définir ici
 
-      res.status(201).json(result.rows[0]);
+    await createNotification(
+      mission.jockey_id, // ✅ On peut maintenant l’utiliser
+      MISSION_STATUS.CONFIRMED,
+      id
+    );
+
+    res.status(201).json(mission);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur lors de la validation' });
   }
 };
 
-const path = require('path');
-
-const uploadGpx = async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user.id;
-
-  if (!req.file) {
-    return res.status(400).json({ error: "Fichier GPX manquant" });
-  }
-
-  const gpxPath = `/uploads/${req.file.filename}`;
-
-  try {
-    const result = await pool.query(
-      `UPDATE missions SET gpx_file_url = $1 WHERE id = $2 AND jockey_id = $3 RETURNING *`,
-      [gpxPath, id, userId]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(403).json({ error: "Non autorisé ou mission incorrecte" });
-    }
-
-    res.status(200).json({ message: "Fichier GPX uploadé avec succès", gpxPath });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erreur serveur" });
-  }
-};
 
 
 
@@ -394,5 +427,5 @@ module.exports = {
   rejectMission,
   completeMissionUpload,
   confirmMission,
-  uploadGpx
+  rejectGpx
 };

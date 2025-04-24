@@ -62,7 +62,7 @@ async function initializeDatabase() {
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         type TEXT NOT NULL CHECK (type IN (
-          'claim', 'accepted', 'rejected', 'completed', 'confirmed', 'expired', 'review'
+          'claim', 'accepted', 'rejected','rejected-gpx', 'completed', 'confirmed', 'expired', 'review'
         )),
         mission_id INTEGER REFERENCES missions(id) ON DELETE CASCADE,
         created_at TIMESTAMP DEFAULT NOW(),
