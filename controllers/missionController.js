@@ -1,5 +1,6 @@
 const pool = require('../db');
 const { createNotification } = require('./notificationController');
+const { supabase } = require("../lib/supabaseClient");
 
 const MISSION_STATUS = {
     OPEN: 'open',
@@ -285,10 +286,10 @@ const rejectMission = async (req, res) => {
 };
 
 // Complete une mission (par le jockey)
-
 const completeMissionUpload = async (req, res) => {
   const jockeyId = req.user.id;
   const { id } = req.params;
+  const file = req.file;
 
   try {
     const missionRes = await pool.query(`SELECT * FROM missions WHERE id = $1`, [id]);
@@ -298,25 +299,22 @@ const completeMissionUpload = async (req, res) => {
       return res.status(400).json({ error: 'Mission non disponible ou accès refusé' });
     }
 
-    let gpxFilename = null;
-    if (req.file) {
-      const ext = path.extname(req.file.originalname).toLowerCase();
-
-      // Vérifie l'extension
-      if (ext !== '.gpx') {
-        return res.status(400).json({ error: 'invalidFileType' });
-      }
-
-      gpxFilename = req.file.filename;
-    } else {
-      return res.status(400).json({ error: 'missingFile' });
+    if (!file || !file.originalname.endsWith('.gpx')) {
+      return res.status(400).json({ error: 'invalidFileType' });
     }
+
+    const filePath = `${id}/${Date.now()}_${file.originalname}`;
+    const { error: uploadError } = await supabase.storage
+      .from('gpx-file')
+      .upload(filePath, file.buffer, { contentType: 'application/gpx+xml' });
+
+    if (uploadError) throw uploadError;
 
     const updateRes = await pool.query(
       `UPDATE missions 
        SET status = $1, completed_at = NOW(), gpx_file = $2
        WHERE id = $3 RETURNING *`,
-      [MISSION_STATUS.COMPLETED, gpxFilename, id]
+      [MISSION_STATUS.COMPLETED, filePath, id]
     );
 
     await createNotification(
@@ -333,17 +331,11 @@ const completeMissionUpload = async (req, res) => {
   }
 };
 
-
-const fs = require('fs');
-const path = require('path');
-
-//rejeter un fichier gpx pour l'utilisateur
 const rejectGpx = async (req, res) => {
   const userId = req.user.id;
   const { id } = req.params;
 
   try {
-    // 1. Vérifie que la mission appartient au user et qu’elle est au statut completed
     const result = await pool.query(
       `SELECT * FROM missions WHERE id = $1 AND user_id = $2 AND status = 'completed'`,
       [id, userId]
@@ -355,17 +347,12 @@ const rejectGpx = async (req, res) => {
 
     const mission = result.rows[0];
 
-    // 2. Supprimer le fichier s'il existe
     if (mission.gpx_file) {
-      const filePath = path.join(__dirname, '..', 'uploads', 'gpx', mission.gpx_file);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      await supabase.storage.from('gpx-file').remove([mission.gpx_file]);
     }
 
-    // 3. Remettre le statut à 'accepted' et vider le champ gpx_file
     await pool.query(
-      `UPDATE missions SET status = 'accepted',completed_at = null, gpx_file = NULL WHERE id = $1`,
+      `UPDATE missions SET status = 'accepted', completed_at = null, gpx_file = NULL WHERE id = $1`,
       [id]
     );
 
