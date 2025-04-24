@@ -26,7 +26,7 @@ router.delete('/:id', authenticate, deleteMission);                  // Supprime
 router.post('/:id/claim', authenticate, claimMission);              // Se proposer pour une mission
 router.post('/:id/reject', authenticate, rejectMission);            // L'utilisateur peut rejeter un jockey
 router.post('/:id/accept', authenticate, acceptMission);            // L'utilisateur peut accepter un jockey
-router.post('/:id/complete', authenticate, upload.single('gpxFile'), completeMissionUpload);            // Soumettre une preuve
+router.post("/:id/complete",authenticate, upload.single("gpxFile"),completeMissionUpload); // Soumettre une preuve
 router.post('/:id/confirm', authenticate, confirmMission);        // Confirmer la mission
 router.post('/:id/reject-gpx', authenticate, rejectGpx);
 

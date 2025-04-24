@@ -1,20 +1,16 @@
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
-const uploadDir = path.join(__dirname, "../uploads/gpx");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const storage = multer.memoryStorage(); // <-- la clé !
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `mission-${req.params.id}-${unique}${ext}`);
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // max 5MB
+  fileFilter: (req, file, cb) => {
+    if (!file.originalname.endsWith(".gpx")) {
+      return cb(new Error("Seuls les fichiers GPX sont autorisés"));
+    }
+    cb(null, true);
   },
 });
 
-const upload = multer({ storage });
 module.exports = upload;

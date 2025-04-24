@@ -299,16 +299,22 @@ const completeMissionUpload = async (req, res) => {
       return res.status(400).json({ error: 'Mission non disponible ou accès refusé' });
     }
 
-    if (!file || !file.originalname.endsWith('.gpx')) {
+    if (!file || !file.buffer || !file.originalname.endsWith('.gpx')) {
       return res.status(400).json({ error: 'invalidFileType' });
     }
 
     const filePath = `${id}/${Date.now()}_${file.originalname}`;
     const { error: uploadError } = await supabase.storage
       .from('gpx-file')
-      .upload(filePath, file.buffer, { contentType: 'application/gpx+xml' });
+      .upload(filePath, file.buffer, {
+        contentType: 'application/gpx+xml',
+        upsert: false, // on ne veut pas écraser d'anciens fichiers
+      });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error(uploadError);
+      return res.status(500).json({ error: 'uploadFailed' });
+    }
 
     const updateRes = await pool.query(
       `UPDATE missions 
@@ -324,12 +330,12 @@ const completeMissionUpload = async (req, res) => {
     );
 
     res.status(201).json(updateRes.rows[0]);
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'unknown' });
   }
 };
+
 
 const rejectGpx = async (req, res) => {
   const userId = req.user.id;
