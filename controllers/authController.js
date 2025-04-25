@@ -73,7 +73,7 @@ const register = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    const confirmationLink = `${process.env.FRONTEND_URL}/confirm?token=${token}`;
+    const confirmationLink = `${process.env.FRONTEND_URL}/${locale || 'fr'}/confirm?token=${token}`;
     await sendConfirmationEmail(email, confirmationLink,locale || 'fr');
 
      // --- 10. Réponse ---
@@ -120,7 +120,7 @@ const login = async (req, res) => {
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
+    res.json({ token, user: { id: user.id, username: user.username, email: user.email, premium_until:user.premium_until } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'unknown' });
@@ -147,7 +147,7 @@ const sendResetPasswordEmail = async (req, res) => {
     if (!user) return res.status(200).json({ message: "emailSentIfExists" });
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: "1h" });
-    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const resetLink = `${process.env.FRONTEND_URL}/${locale || 'fr'}/reset-password?token=${token}`;
 
     await sendResetPasswordMail(email, resetLink, locale);
 

@@ -11,7 +11,7 @@ const getUserProfile = async (req, res) => {
   const offsetCreated = parseInt(req.query.missionsOffset) || 0;
   try {
     const userResult = await pool.query(
-      "SELECT id, username, profile_link FROM users WHERE id = $1",
+      "SELECT id, username,premium_until, profile_link FROM users WHERE id = $1",
       [id]
     );
 
