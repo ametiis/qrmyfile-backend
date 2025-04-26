@@ -91,7 +91,8 @@ const confirmEmail = async (req, res) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userId;
-
+    console.log("Enregistrement de l'utilisateur :",userId);
+    
     await pool.query(
       `UPDATE users SET is_active = TRUE WHERE id = $1`,
       [userId]
