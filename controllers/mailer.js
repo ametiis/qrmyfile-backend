@@ -46,6 +46,80 @@ const sendResetPasswordMail = async (to, link, locale = "fr") => {
 
 }
 
+const sendJockeyAppliedMail = async (to, link, locale = "fr") => {
+  const translations = {
+    fr: {
+      subject: "👟 Un jockey veut relever ta mission !",
+      html: `
+        <h1>🔥 Bonne nouvelle !</h1>
+        <p>Un jockey a postulé pour accomplir ta mission sur <strong>JogForMe</strong>.</p>
+        <p>👉 Clique ici pour voir son profil et accepter sa candidature :</p>
+        <p><a href="${link}" style="color: #0070f3;">Voir la mission</a></p>
+        <p>Une fois accepté, tu pourras finaliser le paiement et suivre son avancée.</p>
+        <p>À très vite sur <strong>JogForMe</strong> 🏃‍♂️💨</p>
+      `
+    },
+    en: {
+      subject: "👟 A jockey applied to your mission!",
+      html: `
+        <h1>🔥 Good news!</h1>
+        <p>A jockey has applied to complete your mission on <strong>JogForMe</strong>.</p>
+        <p>👉 Click here to view their profile and accept the application:</p>
+        <p><a href="${link}" style="color: #0070f3;">View the mission</a></p>
+        <p>Once accepted, you’ll be able to finalize payment and track progress.</p>
+        <p>See you soon on <strong>JogForMe</strong> 🏃‍♀️💨</p>
+      `
+    }
+  };
+
+  const content = translations[locale] || translations.fr;
+
+  await sendMail({
+    from: `"JogForMe" <no_reply@Jogforme.com>`,
+    to,
+    subject: content.subject,
+    html: content.html,
+  });
+};
+
+const sendMissionAcceptedMail = async (to, link, locale = "fr") => {
+  const translations = {
+    fr: {
+      subject: "🎉 Ta mission a été acceptée !",
+      html: `
+        <h1>🏁 En route !</h1>
+        <p>Le créateur de la mission a accepté ta candidature sur <strong>JogForMe</strong>.</p>
+        <p>Tu peux maintenant te préparer à courir et suivre les prochaines étapes :</p>
+        <p><a href="${link}" style="color: #0070f3;">Voir la mission</a></p>
+        <p>Merci d’être un vrai jockey ✨</p>
+        <p>À bientôt sur <strong>JogForMe</strong> 👟</p>
+      `
+    },
+    en: {
+      subject: "🎉 Your mission was accepted!",
+      html: `
+        <h1>🏁 Let’s go!</h1>
+        <p>The mission creator has accepted your application on <strong>JogForMe</strong>.</p>
+        <p>You can now get ready to run and follow the next steps:</p>
+        <p><a href="${link}" style="color: #0070f3;">View the mission</a></p>
+        <p>Thanks for being a true jockey ✨</p>
+        <p>See you soon on <strong>JogForMe</strong> 👟</p>
+      `
+    }
+  };
+
+  const content = translations[locale] || translations.fr;
+
+  await sendMail({
+    from: `"JogForMe" <no_reply@Jogforme.com>`,
+    to,
+    subject: content.subject,
+    html: content.html,
+  });
+};
+
+
+
 
 async function sendConfirmationEmail(to, link, locale = "fr") {
   const translations = {
@@ -108,6 +182,116 @@ const sendContactEmail = async ({ name, email, message }) => {
 
 };
 
+const sendMissionCompletedMail = async (to, link, locale = "fr") => {
+  const translations = {
+    fr: {
+      subject: "✅ Ton jockey a terminé la mission !",
+      html: `
+        <h1>🎯 Mission accomplie !</h1>
+        <p>Le jockey a marqué la mission comme terminée sur <strong>JogForMe</strong>.</p>
+        <p>Tu peux maintenant vérifier son activité et valider la mission :</p>
+        <p><a href="${link}" style="color: #0070f3;">Voir la mission</a></p>
+        <p>Merci d’avoir utilisé JogForMe – la sueur par procuration 😄</p>
+        <p>À bientôt 👟</p>
+      `
+    },
+    en: {
+      subject: "✅ Your jockey completed the mission!",
+      html: `
+        <h1>🎯 Mission complete!</h1>
+        <p>Your jockey has marked the mission as completed on <strong>JogForMe</strong>.</p>
+        <p>You can now check their activity and confirm the mission:</p>
+        <p><a href="${link}" style="color: #0070f3;">View the mission</a></p>
+        <p>Thanks for using JogForMe – sweating by proxy 😄</p>
+        <p>See you soon 👟</p>
+      `
+    }
+  };
+
+  const content = translations[locale] || translations.fr;
+
+  await sendMail({
+    from: `"JogForMe" <no_reply@Jogforme.com>`,
+    to,
+    subject: content.subject,
+    html: content.html,
+  });
+};
+
+const sendGpxRejectedMail = async (to, link, locale = "fr") => {
+  const translations = {
+    fr: {
+      subject: "❌ Fichier GPX refusé",
+      html: `
+        <h1>🧐 Hmm... ton GPX a été refusé</h1>
+        <p>Le client n’a pas validé le fichier que tu as envoyé pour la mission.</p>
+        <p>Tu peux vérifier les détails ici et soumettre un nouveau fichier si besoin :</p>
+        <p><a href="${link}" style="color: #0070f3;">Voir la mission</a></p>
+        <p>Pas de panique, ça arrive à tout le monde 😅</p>
+        <p>On est avec toi 💪</p>
+      `
+    },
+    en: {
+      subject: "❌ GPX file rejected",
+      html: `
+        <h1>🧐 Hmm... your GPX was rejected</h1>
+        <p>The client did not validate the file you uploaded for the mission.</p>
+        <p>You can check the details here and upload a new file if needed:</p>
+        <p><a href="${link}" style="color: #0070f3;">View the mission</a></p>
+        <p>No worries — it happens to the best! 😅</p>
+        <p>We’re rooting for you 💪</p>
+      `
+    }
+  };
+
+  const content = translations[locale] || translations.fr;
+
+  await sendMail({
+    from: `"JogForMe" <no_reply@Jogforme.com>`,
+    to,
+    subject: content.subject,
+    html: content.html,
+  });
+};
+
+const sendGpxAcceptedMail = async (to, link, locale = "fr") => {
+  const translations = {
+    fr: {
+      subject: "✅ GPX validé !",
+      html: `
+        <h1>👏 Bien joué !</h1>
+        <p>Le client a validé ton fichier GPX pour la mission.</p>
+        <p>Tu peux consulter les détails ici :</p>
+        <p><a href="${link}" style="color: #0070f3;">Voir la mission</a></p>
+        <p>Merci d’avoir couru pour JogForMe 🏃‍♂️💨</p>
+        <p>À bientôt pour une nouvelle mission !</p>
+      `
+    },
+    en: {
+      subject: "✅ GPX approved!",
+      html: `
+        <h1>👏 Nice work!</h1>
+        <p>The client has approved your GPX file for the mission.</p>
+        <p>You can check the details here:</p>
+        <p><a href="${link}" style="color: #0070f3;">View the mission</a></p>
+        <p>Thanks for running with JogForMe 🏃‍♀️💨</p>
+        <p>See you soon for your next mission!</p>
+      `
+    }
+  };
+
+  const content = translations[locale] || translations.fr;
+
+  await sendMail({
+    from: `"JogForMe" <no_reply@Jogforme.com>`,
+    to,
+    subject: content.subject,
+    html: content.html,
+  });
+};
+
+
+
 sendMail= async ({from,to,subject,html})=>{
   if(process.env.NODE_ENV ==="development"){
     console.log(" === EMAIL SIMULE ===");
@@ -128,4 +312,6 @@ sendMail= async ({from,to,subject,html})=>{
 }
 
 
-module.exports = { sendConfirmationEmail, sendResetPasswordMail,sendContactEmail };
+
+
+module.exports = { sendConfirmationEmail, sendResetPasswordMail,sendContactEmail, sendJockeyAppliedMail, sendMissionAcceptedMail,sendMissionCompletedMail, sendGpxRejectedMail, sendGpxAcceptedMail };

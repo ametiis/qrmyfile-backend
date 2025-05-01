@@ -1,6 +1,7 @@
 const pool = require('../db');
 const { createNotification } = require('./notificationController');
 const { supabase } = require("../lib/supabaseClient");
+const { sendJockeyAppliedMail,sendMissionAcceptedMail,sendMissionCompletedMail, sendGpxRejectedMail, sendGpxAcceptedMail } = require("./mailer");
 
 const MISSION_STATUS = {
     OPEN: 'open',
@@ -194,34 +195,45 @@ const claimMission = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const mission = await pool.query(`SELECT * FROM missions WHERE id = $1`, [id]);
+    const missionRes = await pool.query(`SELECT * FROM missions WHERE id = $1`, [id]);
+    const mission = missionRes.rows[0];
 
-    if (mission.rows.length === 0 || mission.rows[0].status !== 'open') {
+    if (!mission || mission.status !== 'open') {
       return res.status(400).json({ error: 'Mission non disponible' });
     }
 
-    if (jockeyId == mission.rows[0].user_id) {
-        return res.status(400).json({ error: 'Vous ne pouvez pas accepter votre propre mission' });
-      }
+    if (jockeyId == mission.user_id) {
+      return res.status(400).json({ error: 'Vous ne pouvez pas accepter votre propre mission' });
+    }
 
     const result = await pool.query(
-      `UPDATE missions SET status = $1, jockey_id = $2, claimed_at = NOW() WHERE id = $3  RETURNING *`,
+      `UPDATE missions SET status = $1, jockey_id = $2, claimed_at = NOW() WHERE id = $3 RETURNING *`,
       [MISSION_STATUS.CLAIMED, jockeyId, id]
     );
 
     await createNotification(
-       mission.rows[0].user_id,
-       "claim",
-       id
-        );
+      mission.user_id,
+      "claim",
+      id
+    );
+
+    // 💌 Récupération des infos du créateur pour lui envoyer le mail
+    const userRes = await pool.query(`SELECT email FROM users WHERE id = $1`, [mission.user_id]);
+    const user = userRes.rows[0];
+    const locale = req.user.locale || 'fr';
+    if (user && user.email) {
+      const missionLink = `https://jogforme.com/${locale}/missions/${id}`;
+      await sendJockeyAppliedMail(user.email, missionLink, locale);
+    }
 
     res.status(201).json(result.rows[0]);
-     
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur lors de la demande' });
   }
 };
+
 
 
 // Accepter un Jockey (par l'utilisateur)
@@ -246,6 +258,16 @@ const acceptMission = async (req, res) => {
       `UPDATE missions SET status = $1, accepted_at = NOW() WHERE id = $2  RETURNING *`,
       [MISSION_STATUS.ACCEPTED, id]
     );
+
+    const jockeyRes = await pool.query(`SELECT email FROM users WHERE id = $1`, [mission.rows[0].jockey_id]);
+const jockey = jockeyRes.rows[0];
+
+if (jockey && jockey.email) {
+  const locale = req.user.locale || 'fr'; 
+  const missionLink = `https://jogforme.com/${locale}/missions/${mission.rows[0].id}`;
+ 
+  await sendMissionAcceptedMail(jockey.email, missionLink, locale);
+}
      
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -329,6 +351,16 @@ const completeMissionUpload = async (req, res) => {
       id
     );
 
+    const clientRes = await pool.query(`SELECT email FROM users WHERE id = $1`, [ updateRes.rows[0].user_id]);
+const client = clientRes.rows[0];
+
+if (client && client.email) {
+  const locale = req.user.locale || 'fr'; // ou hardcode 'fr' si besoin
+  const missionLink = `https://jogforme.com/${locale}/missions/${mission.id}`;
+  
+  await sendMissionCompletedMail(client.email, missionLink, locale);
+}
+
     res.status(201).json(updateRes.rows[0]);
   } catch (err) {
     console.error(err);
@@ -364,6 +396,16 @@ const rejectGpx = async (req, res) => {
 
     await createNotification(mission.jockey_id, 'rejected-gpx', id);
 
+    const jockeyRes = await pool.query(`SELECT email FROM users WHERE id = $1`, [mission.jockey_id]);
+const jockey = jockeyRes.rows[0];
+
+if (jockey && jockey.email) {
+  const locale = req.user.locale || 'fr'; 
+  const missionLink = `https://jogforme.com/${locale}/missions/${mission.id}`;
+
+  await sendGpxRejectedMail(jockey.email, missionLink, locale);
+}
+
     res.json({ message: "gpxRejected" });
   } catch (err) {
     console.error(err);
@@ -398,6 +440,17 @@ const confirmMission = async (req, res) => {
       MISSION_STATUS.CONFIRMED,
       id
     );
+
+    const jockeyRes = await pool.query(`SELECT email FROM users WHERE id = $1`, [mission.jockey_id]);
+const jockey = jockeyRes.rows[0];
+
+if (jockey && jockey.email) {
+  const locale = req.user.locale || 'fr'; 
+  const missionLink = `https://jogforme.com/${locale}/missions/${mission.id}`;
+  
+  await sendGpxAcceptedMail(jockey.email, missionLink, locale);
+}
+
 
     res.status(201).json(mission);
   } catch (err) {
