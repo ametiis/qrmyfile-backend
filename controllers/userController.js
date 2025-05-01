@@ -31,7 +31,7 @@ const getUserProfile = async (req, res) => {
     const missionsAsJockey = await pool.query(
       `SELECT id, title, status, price, currency, distance_km
        FROM missions
-       WHERE jockey_id = $1
+       WHERE jockey_id = $1 and status != 'claimed'
        ORDER BY claimed_at DESC
        LIMIT $2 OFFSET $3`,
       [id, limit, offsetJockey]
