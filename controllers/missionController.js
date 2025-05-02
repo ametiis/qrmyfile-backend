@@ -83,7 +83,7 @@ const createMission = async (req, res) => {
 const listMissions = async (req, res) => {
   const { type, minPrice, maxPace, minDist, maxDist, currency } = req.body;
 
-  let query = `SELECT id, latitude, longitude FROM missions WHERE 1=1`;
+  let query = `SELECT id, latitude, longitude FROM missions WHERE  status = 'open' and 1=1`;
   const params = [];
 
   if (type) {
