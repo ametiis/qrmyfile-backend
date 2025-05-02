@@ -83,7 +83,7 @@ const createMission = async (req, res) => {
 const listMissions = async (req, res) => {
   const { type, minPrice, maxPace, minDist, maxDist, currency } = req.body;
 
-  let query = `SELECT id, latitude, longitude FROM missions WHERE status = 'open' AND 1=1`;
+  let query = `SELECT id, latitude, longitude FROM missions WHERE 1=1`;
   const params = [];
 
   if (type) {
@@ -154,6 +154,22 @@ WHERE missions.id = $1
     res.status(500).json({ error: 'unknown' });
   }
 };
+
+//retourner le nombre de mission et d'utilisateur
+const getCount = async (req, res) => {
+  try {
+    const resultMission = await pool.query('SELECT COUNT(*) AS count FROM missions')
+    const resultUser = await pool.query('SELECT COUNT(*) AS count FROM users')
+
+    const countMission = parseInt(resultMission.rows[0].count, 10)
+    const countUser = parseInt(resultUser.rows[0].count, 10)
+
+    res.json({ mission: countMission, user: countUser })
+  } catch (err) {
+    console.error('Erreur dans getCount:', err)
+    res.status(500).json({ error: 'unknown' })
+  }
+}
 
 
 // Supprimer une mission
@@ -473,5 +489,6 @@ module.exports = {
   rejectMission,
   completeMissionUpload,
   confirmMission,
-  rejectGpx
+  rejectGpx,
+  getCount
 };
