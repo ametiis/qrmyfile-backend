@@ -6,59 +6,78 @@ const { sendContactEmail } = require("./mailer");
 const getUserProfile = async (req, res) => {
   const { id } = req.params;
 
+  const viewerId = req.user?.id ? parseInt(req.user.id, 10) : null;
+  const parsedId = parseInt(id, 10);
+  const isOwner = viewerId === parsedId;
+
   const limit = parseInt(req.query.limit) || 10;
   const offsetJockey = parseInt(req.query.jockeyOffset) || 0;
   const offsetCreated = parseInt(req.query.missionsOffset) || 0;
   try {
     const userResult = await pool.query(
-      "SELECT id, username,premium_until, profile_link FROM users WHERE id = $1",
-      [id]
+      "SELECT id, username, premium_until, profile_link FROM users WHERE id = $1",
+      [parsedId]
     );
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: "unknown" });
     }
 
-    const missionsCreated = await pool.query(
-      `SELECT id, title, status, price, currency, distance_km
-       FROM missions
-       WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [id, limit, offsetCreated]
-    );
+    // 🔹 Missions créées (on ne filtre que si ce n’est pas le propriétaire)
+    const missionsCreatedQuery = `
+      SELECT id, title, status, price, currency, distance_km, is_secret
+      FROM missions
+      WHERE user_id = $1
+      ${isOwner ? '' : 'AND is_secret = false'}
+      ORDER BY created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+    const missionsCreated = await pool.query(missionsCreatedQuery, [parsedId, limit, offsetCreated]);
 
-    const missionsAsJockey = await pool.query(
-      `SELECT id, title, status, price, currency, distance_km
-       FROM missions
-       WHERE jockey_id = $1 and status != 'claimed'
-       ORDER BY claimed_at DESC
-       LIMIT $2 OFFSET $3`,
-      [id, limit, offsetJockey]
-    );
+    // 🔹 Missions en tant que jockey
+    const missionsJockeyQuery = `
+      SELECT id, title, status, price, currency, distance_km, is_secret
+      FROM missions
+      WHERE jockey_id = $1 
+      AND status != 'claimed'
+      ${viewerId === parsedId ? '' : 'AND is_secret = false'}
+      ORDER BY claimed_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+    const missionsAsJockey = await pool.query(missionsJockeyQuery, [parsedId, limit, offsetJockey]);
 
-const totalCreated = await pool.query(
-  `SELECT COUNT(*) FROM missions WHERE user_id = $1`,
-  [id]
-);
-const totalJockey = await pool.query(
-  `SELECT COUNT(*) FROM missions WHERE jockey_id = $1`,
-  [id]
-);
+    // 🔢 Total missions créées (filtrage pareil)
+    const totalCreatedQuery = `
+      SELECT COUNT(*) FROM missions 
+      WHERE user_id = $1 
+      ${isOwner ? '' : 'AND is_secret = false'}
+    `;
+    const totalCreated = await pool.query(totalCreatedQuery, [parsedId]);
 
+    // 🔢 Total missions comme jockey (filtrage pareil)
+    const totalJockeyQuery = `
+      SELECT COUNT(*) FROM missions 
+      WHERE jockey_id = $1 
+      AND status != 'claimed'
+      ${viewerId === parsedId ? '' : 'AND is_secret = false'}
+    `;
+    const totalJockey = await pool.query(totalJockeyQuery, [parsedId]);
 
     res.json({
       ...userResult.rows[0],
       missions: missionsCreated.rows,
       missions_as_jockey: missionsAsJockey.rows,
-      hasMoreMissions: offsetCreated + limit < parseInt(totalCreated.rows[0].count),
-      hasMoreJockey: offsetJockey + limit < parseInt(totalJockey.rows[0].count),
+      hasMoreMissions: offsetCreated + limit < parseInt(totalCreated.rows[0].count, 10),
+      hasMoreJockey: offsetJockey + limit < parseInt(totalJockey.rows[0].count, 10),
     });
   } catch (err) {
     console.error("Erreur lors de la récupération du profil", err);
     res.status(500).json({ error: "unknown" });
   }
 };
+
+
+
 
 // 2. Modifier mot de passe
 const updatePassword = async (req, res) => {

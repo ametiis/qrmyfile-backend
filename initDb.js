@@ -40,7 +40,8 @@ async function initializeDatabase() {
         completed_at timestamp,
         confirmed_at timestamp,
         currency VARCHAR(10) DEFAULT 'EUR',
-        gpx_file TEXT
+        gpx_file TEXT,
+        is_secret BOOLEAN DEFAULT false
       );
     `);
 

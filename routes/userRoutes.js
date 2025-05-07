@@ -5,10 +5,10 @@ const { getUserProfile, updatePassword, updateProfile, becomePremium,deleteAccou
 
 // Middleware de simulation pour injecter userId depuis un token
 const authenticate = require('../middleware/authenticate');
-
+const optionalAuth = require("../middleware/optionalAuth");
 
 //Récupère les information d'un user
-router.get('/:id', getUserProfile);
+router.get('/:id',optionalAuth, getUserProfile);
 
 //Permet de maj le password de l'utilisateur
 router.put('/password', authenticate, updatePassword);

@@ -26,7 +26,8 @@ const createMission = async (req, res) => {
     type,
     deadline,
     pace, // format attendu : "4:30"
-    currency
+    currency,
+    isSecret = false 
   } = req.body;
 
   // Vérification de la présence et des types
@@ -52,8 +53,8 @@ const createMission = async (req, res) => {
   try {
     const result = await pool.query(
       `INSERT INTO missions 
-        (user_id, title, description, price, longitude, latitude, distance_km, type, deadline, pace_seconds_per_km, currency)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11)
+        (user_id, title, description, price, longitude, latitude, distance_km, type, deadline, pace_seconds_per_km, currency,is_secret)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11,$12)
        RETURNING *`,
       [
         userId,
@@ -66,7 +67,8 @@ const createMission = async (req, res) => {
         type.trim(),
         deadline,
         paceInSeconds,
-        currency
+        currency,
+        isSecret
       ]
     );
 
