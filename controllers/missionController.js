@@ -13,71 +13,74 @@ const MISSION_STATUS = {
     
   };
 
-// Créer une mission
-const createMission = async (req, res) => {
-  const userId = req.user.id;
-  const {
-    title,
-    description,
-    price,
-    longitude,
-    latitude,
-    distance_km,
-    type,
-    deadline,
-    pace, // format attendu : "4:30"
-    currency,
-    isSecret = false 
-  } = req.body;
-
-  // Vérification de la présence et des types
-  if (
-    typeof title !== "string" || title.trim() === "" ||
-    typeof description !== "string" || description.trim() === "" ||
-    typeof type !== "string" || type.trim() === "" ||
-    typeof price !== "number" || isNaN(price) || price < 0 ||
-    typeof distance_km !== "number" || isNaN(distance_km) || distance_km <= 0 ||
-    typeof longitude !== "number" || typeof latitude !== "number" ||
-    !deadline || isNaN(Date.parse(deadline))
-  ) {
-    return res.status(400).json({ error: "errorCreatingMission" });
-  }
-
-  // Gestion de la vitesse (facultatif)
-  let paceInSeconds = null;
-  if (pace && typeof pace === "string" && /^\d+:\d{2}$/.test(pace)) {
-    const [min, sec] = pace.split(":").map(Number);
-    paceInSeconds = min * 60 + sec;
-  }
-
-  try {
-    const result = await pool.query(
-      `INSERT INTO missions 
-        (user_id, title, description, price, longitude, latitude, distance_km, type, deadline, pace_seconds_per_km, currency,is_secret)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,$11,$12)
-       RETURNING *`,
-      [
-        userId,
-        title.trim(),
-        description.trim(),
-        price,
-        longitude,
-        latitude,
-        distance_km,
-        type.trim(),
-        deadline,
-        paceInSeconds,
-        currency,
-        isSecret
-      ]
-    );
-
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "unknown" });
-  }
-};
+  const createMission = async (req, res) => {
+    const userId = req.user.id;
+    const {
+      title,
+      description,
+      price,
+      longitude,
+      latitude,
+      distance_km,
+      type,
+      deadline,
+      pace, // format attendu : "4:30"
+      currency,
+      isSecret = false,
+      isFree = false
+    } = req.body;
+  
+    // Vérification de la présence et des types
+    if (
+      typeof title !== "string" || title.trim() === "" ||
+      typeof description !== "string" || description.trim() === "" ||
+      typeof type !== "string" || type.trim() === "" ||
+      (!isFree && (typeof price !== "number" || isNaN(price) || price < 0)) ||
+      typeof distance_km !== "number" || isNaN(distance_km) || distance_km <= 0 ||
+      typeof longitude !== "number" || typeof latitude !== "number" ||
+      !deadline || isNaN(Date.parse(deadline)) || new Date(deadline) < new Date()
+    ) {
+      return res.status(400).json({ error: "errorCreatingMission" });
+    }
+  
+    // Gestion de la vitesse (facultatif)
+    let paceInSeconds = null;
+    if (pace && typeof pace === "string" && /^\d+:\d{2}$/.test(pace)) {
+      const [min, sec] = pace.split(":").map(Number);
+      paceInSeconds = min * 60 + sec;
+    }
+  
+    try {
+      const result = await pool.query(
+        `INSERT INTO missions 
+          (user_id, title, description, price, longitude, latitude, distance_km, type, deadline, pace_seconds_per_km, currency, is_secret, is_free)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         RETURNING *`,
+        [
+          userId,
+          title.trim(),
+          description.trim(),
+          isFree ? 0 : price,
+          longitude,
+          latitude,
+          distance_km,
+          type.trim(),
+          deadline,
+          paceInSeconds,
+          isFree ? null : currency,
+          isSecret,
+          isFree
+        ]
+      );
+  
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "unknown" });
+    }
+  };
+  
+  
 
 
 
