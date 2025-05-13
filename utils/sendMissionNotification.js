@@ -29,7 +29,7 @@ const sendMissionNotification = async (mission, creatorId) => {
   for (const user of userResult.rows) {
     const dist = haversine(missionLat, missionLng, user.latitude, user.longitude);
     if (dist <= user.km_notification) {
-      const missionLink = `${process.env.FRONTEND_URL}/mission/${missionId}`;
+      const missionLink = `${process.env.FRONTEND_URL}/missions/${missionId}`;
       await mailer.sendNearbyMissionNotification(user.email, missionLink);
     }
   }
