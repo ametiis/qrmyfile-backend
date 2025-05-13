@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const { enqueueEmail } = require("../utils/emailQueue");
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
@@ -254,50 +255,39 @@ const sendGpxRejectedMail = async (to, link, locale = "fr") => {
   });
 };
 
-const sendNearbyMissionNotification = async (to, missionLink, locale = "fr") => {
+const sendNearbyMissionNotification = (to, missionLink, locale = "fr") => {
   const translations = {
     fr: {
       subject: "📍 Nouvelle mission proche de toi !",
       html: `
-        <h1>👋 Hey toi,</h1>
+        <h1>👋 Hey toi, runner futé !</h1>
         <p>Une mission vient d'être créée non loin de ta position sur <strong>JogForMe</strong>.</p>
         <p>Elle n'attend que toi pour être réalisée 💪</p>
         <p><a href="${missionLink}" style="color: #0070f3; font-weight: bold;">Voir la mission</a></p>
-        <p>Tu peux l'accepter en un clic et te dépenser...</p>
         <p>On t'attend sur <strong>JogForMe</strong> 🏃‍♂️🚀</p>
       `
     },
     en: {
       subject: "📍 New mission near you!",
       html: `
-        <h1>👋 Hey you,</h1>
-        <p>A mission was just created close to your location on <strong>JogForMe</strong>.</p>
-        <p>It’s waiting for someone like you to crush it 💪</p>
-        <p><a href="\${missionLink}" style="color: #0070f3; font-weight: bold;">Check out the mission</a></p>
-        <p>You can accept it in one click and get moving...</p>
-        <p>We’re waiting for you on <strong>JogForMe</strong> 🏃‍♀️🚀</p>
+        <h1>👋 Hey runner!</h1>
+        <p>A new mission just popped up close to your location on <strong>JogForMe</strong>.</p>
+        <p>It’s waiting for someone like you to take it on 💪</p>
+        <p><a href="${missionLink}" style="color: #0070f3; font-weight: bold;">Check the mission</a></p>
+        <p>See you soon on <strong>JogForMe</strong> 🏃‍♀️🚀</p>
       `
-    },
-    bn: {
-      subject: "📍 আপনার কাছাকাছি একটি নতুন মিশন এসেছে!",
-      html: `
-        <h1>👋 হেই তুমি,</h1>
-        <p><strong>JogForMe</strong>-তে তোমার অবস্থানের কাছে একটি নতুন মিশন তৈরি হয়েছে।</p>
-        <p>এটা শুধু তোমার জন্য অপেক্ষা করছে 💪</p>
-        <p><a href="\${missionLink}" style="color: #0070f3; font-weight: bold;">মিশনটি দেখো</a></p>
-        <p>এক ক্লিকে এটি গ্রহণ করো এবং শুরু করো...</p>
-        <p>তোমার জন্য অপেক্ষা করছে <strong>JogForMe</strong> 🏃‍♂️🚀</p>
-      `
-    }       
+    }
   };
 
-  const content = translations[locale] || translations.fr;
+  const { subject, html } = translations[locale] || translations.fr;
 
-  await sendMail({
-    from: `"JogForMe" <no_reply@Jogforme.com>`,
+  enqueueEmail({
     to,
-    subject: content.subject,
-    html: content.html
+    subject,
+    html,
+    sendFunction: async (to, subject, html) => {
+      await sendMail({ from: `"JogForMe" <no_reply@jogforme.com>`, to, subject, html });
+    }
   });
 };
 
