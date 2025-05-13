@@ -9,13 +9,12 @@ const getUserProfile = async (req, res) => {
   const viewerId = req.user?.id ? parseInt(req.user.id, 10) : null;
   const parsedId = parseInt(id, 10);
   const isOwner = viewerId === parsedId;
-
   const limit = parseInt(req.query.limit) || 10;
   const offsetJockey = parseInt(req.query.jockeyOffset) || 0;
   const offsetCreated = parseInt(req.query.missionsOffset) || 0;
   try {
     const userResult = await pool.query(
-      "SELECT id, username, premium_until, profile_link FROM users WHERE id = $1",
+      "SELECT id, username, premium_until FROM users WHERE id = $1",
       [parsedId]
     );
 
@@ -191,8 +190,66 @@ const sendContactMessage = async (req, res) => {
   }
 };
 
+//7. récupérer localisation
+const getUserLocation = async (req, res) => {
+  
+  const userId = req.user.id;
+
+  // Vérifie que l'ID est bien un entier
+  if (!userId || isNaN(userId)) {
+    return res.status(400).json({ error: "invalidUserId" });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT latitude, longitude, km_notification FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "notFound" });
+    }
+
+   
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error fetching user location:", err);
+    res.status(500).json({ error: "unknown" });
+  }
+};
+
+
+//8. Updater localisation
+const updateUserLocation = async (req, res) => {
+  const userId = req.user.id;
+  const { latitude, longitude, km_notification } = req.body;
+
+  // Validation simple
+  if (
+    typeof latitude !== "number" || isNaN(latitude) ||
+    typeof longitude !== "number" || isNaN(longitude) ||
+    typeof km_notification !== "number" || isNaN(km_notification) ||
+    km_notification < 0 || km_notification > 150
+  ) {
+    return res.status(400).json({ error: "invalidData" });
+  }
+
+  try {
+    const result = await pool.query(
+      "UPDATE users SET latitude = $1, longitude = $2, km_notification = $3 WHERE id = $4 RETURNING latitude, longitude, km_notification",
+      [latitude, longitude, km_notification, userId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error updating location:", err);
+    res.status(500).json({ error: "unknown" });
+  }
+};
 
 
 
 
-module.exports = { getUserProfile, updatePassword, updateProfile, becomePremium, deleteAccount, sendContactMessage };
+
+
+module.exports = { getUserProfile, updatePassword, updateProfile, becomePremium, deleteAccount, sendContactMessage, getUserLocation,updateUserLocation };

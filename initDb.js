@@ -13,7 +13,9 @@ async function initializeDatabase() {
         is_active BOOLEAN DEFAULT false,
         avatar_url TEXT,
         profile_link TEXT,
-        created_at TIMESTAMP DEFAULT NOW()
+        created_at TIMESTAMP DEFAULT NOW(),
+        latitude DOUBLE PRECISION,
+        longitude DOUBLE PRECISION,
       );
     `);
 

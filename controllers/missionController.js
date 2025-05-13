@@ -2,6 +2,7 @@ const pool = require('../db');
 const { createNotification } = require('./notificationController');
 const { supabase } = require("../lib/supabaseClient");
 const { sendJockeyAppliedMail,sendMissionAcceptedMail,sendMissionCompletedMail, sendGpxRejectedMail, sendGpxAcceptedMail } = require("./mailer");
+const sendMissionNotification = require("../utils/sendMissionNotification");
 
 const MISSION_STATUS = {
     OPEN: 'open',
@@ -73,7 +74,14 @@ const MISSION_STATUS = {
         ]
       );
   
-      res.status(201).json(result.rows[0]);
+      const createdMission = result.rows[0];
+      res.status(201).json(createdMission);
+      
+      // 🔔 Appelle la fonction de notification de manière asynchrone, sans bloquer
+      sendMissionNotification(createdMission, userId).catch((err) => {
+        console.error("Erreur lors de l'envoi des notifications :", err);
+      });
+      
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "unknown" });

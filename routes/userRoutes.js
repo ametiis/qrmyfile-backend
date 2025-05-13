@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { getUserProfile, updatePassword, updateProfile, becomePremium,deleteAccount, sendContactMessage } = require('../controllers/userController');
+const { getUserProfile, updatePassword, updateProfile, becomePremium,deleteAccount, sendContactMessage, getUserLocation,updateUserLocation } = require('../controllers/userController');
 
 
 // Middleware de simulation pour injecter userId depuis un token
 const authenticate = require('../middleware/authenticate');
 const optionalAuth = require("../middleware/optionalAuth");
+
+//Récupérer localisation
+router.get("/location", authenticate, getUserLocation);
 
 //Récupère les information d'un user
 router.get('/:id',optionalAuth, getUserProfile);
@@ -24,6 +27,10 @@ router.delete('/delete', authenticate, deleteAccount);
 
 //Envoyer mail via formulaire de contact 
 router.post('/contact', sendContactMessage);
+
+
+//Modifier localisation
+router.put("/location", authenticate, updateUserLocation);
 
 
 
