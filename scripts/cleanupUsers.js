@@ -1,15 +1,8 @@
 const pool = require('../db');
 
-// Timeout global (30s max)
-const MAX_DURATION_MS = 30000;
-const timeout = setTimeout(() => {
-  console.error('⏱️ Le script a dépassé la durée maximale autorisée (30s).');
-  process.exit(1);
-}, MAX_DURATION_MS);
-
 const cleanupUsers = async () => {
   try {
-    // Timeout SQL (5s)
+    // Timeout PostgreSQL : 5 secondes max
     await pool.query(`SET statement_timeout TO 5000`);
 
     const result = await pool.query(`
@@ -19,22 +12,18 @@ const cleanupUsers = async () => {
       RETURNING id, email
     `);
 
-    console.log(`🧹 Utilisateurs supprimés : ${result.rowCount}`);
+    console.log(`✅ Utilisateurs supprimés : ${result.rowCount}`);
     if (result.rowCount > 0) {
       result.rows.forEach(row => {
         console.log(`- [${row.id}] ${row.email}`);
       });
     } else {
-      console.log("Aucun utilisateur inactif à supprimer.");
+      console.log("Aucun utilisateur à supprimer.");
     }
-
-    clearTimeout(timeout);
-    process.exit(0);
   } catch (err) {
-    console.error('❌ Erreur lors du nettoyage des utilisateurs :', err.message || err);
-    clearTimeout(timeout);
-    process.exit(1);
+    console.error('❌ Erreur dans cleanupUsers :', err.message || err);
+    throw err; // important pour que le script appelant puisse gérer l'erreur
   }
 };
 
-cleanupUsers();
+module.exports = cleanupUsers;
