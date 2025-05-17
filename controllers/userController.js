@@ -27,6 +27,7 @@ const getUserProfile = async (req, res) => {
       SELECT id, title, status, price, currency, distance_km, is_secret
       FROM missions
       WHERE user_id = $1
+      AND status != 'expired'
       ${isOwner ? '' : 'AND is_secret = false'}
       ORDER BY created_at DESC
       LIMIT $2 OFFSET $3
@@ -39,6 +40,7 @@ const getUserProfile = async (req, res) => {
       FROM missions
       WHERE jockey_id = $1 
       AND status != 'claimed'
+      AND status != 'expired'
       ${viewerId === parsedId ? '' : 'AND is_secret = false'}
       ORDER BY claimed_at DESC
       LIMIT $2 OFFSET $3
@@ -49,6 +51,7 @@ const getUserProfile = async (req, res) => {
     const totalCreatedQuery = `
       SELECT COUNT(*) FROM missions 
       WHERE user_id = $1 
+      AND status != 'expired'
       ${isOwner ? '' : 'AND is_secret = false'}
     `;
     const totalCreated = await pool.query(totalCreatedQuery, [parsedId]);
@@ -58,6 +61,7 @@ const getUserProfile = async (req, res) => {
       SELECT COUNT(*) FROM missions 
       WHERE jockey_id = $1 
       AND status != 'claimed'
+      AND status != 'expired'
       ${viewerId === parsedId ? '' : 'AND is_secret = false'}
     `;
     const totalJockey = await pool.query(totalJockeyQuery, [parsedId]);
