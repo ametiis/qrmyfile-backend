@@ -1,5 +1,5 @@
-const cleanupUsers = require('../tasks/cleanupUsers');
-const cleanupMissions = require('../tasks/cleanupMissions');
+const cleanupUsers = require('./cleanupUsers');
+const cleanupMissions = require('./cleanupMissions');
 
 const MAX_DURATION_MS = 60000;
 const timeout = setTimeout(() => {
