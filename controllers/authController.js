@@ -5,10 +5,12 @@ const validator = require("validator");
 const { sendConfirmationEmail,sendResetPasswordMail } = require("./mailer");
 
 const register = async (req, res) => {
-  const { username, email, password, confirmPassword, profile_link } = req.body;
+  const {  email, password, confirmPassword } = req.body;
   const { locale } = req.body;
   // --- 1. Champs requis ---
-  if (!username || !email || !password || !confirmPassword) {
+  console.log(password);
+  console.log(confirmPassword);
+  if (!email || !password || !confirmPassword) {
     return res.status(400).json({ error: "missingFields" });
   }
 
@@ -16,12 +18,6 @@ const register = async (req, res) => {
   if (!validator.isEmail(email)) {
     console.log(email);
     return res.status(400).json({ error: "invalidEmail" });
-  }
-
-  // --- 3. Vérification du username ---
-  const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
-  if (!usernameRegex.test(username)) {
-    return res.status(400).json({ error: "invalidUsername" });
   }
 
   // --- 4. Vérification du mot de passe ---
@@ -36,10 +32,10 @@ const register = async (req, res) => {
   }
 
   try {
-    // --- 6. Vérifie si l'email ou le username existent déjà ---
+    // --- 6. Vérifie si l'email  existe déjà ---
     const existingUser = await pool.query(
-      `SELECT * FROM users WHERE email = $1 OR username = $2`,
-      [email, username]
+      `SELECT * FROM users WHERE email = $1`,
+      [email]
     );
 
     if (existingUser.rows.length > 0) {
@@ -47,24 +43,18 @@ const register = async (req, res) => {
       if (existing.email === email) {
         return res.status(401).json({ error: "emailAlreadyExists" });
       }
-      if (existing.username === username) {
-        return res.status(401).json({ error: "usernameAlreadyExists" });
-      }
+     
     }
 
     // --- 7. Hasher le mot de passe ---
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // --- 8. Vérifier profile_link s’il est renseigné (optionnel) ---
-    if (profile_link && !validator.isURL(profile_link, { require_protocol: true })) {
-      return res.status(400).json({ error: "invalidProfileLink" });
-    }
-
+  
     // --- 9. Insertion dans la DB ---
     const result = await pool.query(
-      `INSERT INTO users (username, email, password, profile_link)
-       VALUES ($1, $2, $3, $4) RETURNING id, username, email`,
-      [username, email, hashedPassword, profile_link]
+      `INSERT INTO users ( email, password)
+       VALUES ($1, $2) RETURNING id,  email`,
+      [ email, hashedPassword]
     );
 
     const token = jwt.sign(

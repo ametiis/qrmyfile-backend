@@ -10,21 +10,21 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const path = require('path');
 
-app.use(cors());
-app.use(bodyParser.json());
+app.use(cors({
+  origin: '*', // ou ton domaine exact en prod
+  exposedHeaders: ['Content-Disposition'],
+}));
+app.use(bodyParser.json({ limit: "50mb" })); // <== AUGMENTE LA LIMITE JSON
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/missions', require('./routes/missionRoutes'));
-app.use('/api/messages', require('./routes/messageRoutes'));
-app.use('/api/reviews', require('./routes/reviewRoutes'));
-app.use('/api/alerts', require('./routes/alertRoutes'));
-app.use('/api/notifications', require('./routes/notificationsRoutes'));
+app.use('/api/file', require('./routes/fileRoutes'));
+
 
 app.get('/', (req, res) => {
-  res.send('JogForMe API is running');
+  res.send('QRmyfile API is running');
 });
 
 

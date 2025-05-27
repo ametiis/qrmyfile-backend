@@ -1,5 +1,5 @@
+const cleanupFiles = require('./cleanupFiles');
 const cleanupUsers = require('./cleanupUsers');
-const cleanupMissions = require('./cleanupMissions');
 
 const MAX_DURATION_MS = 60000;
 const timeout = setTimeout(() => {
@@ -9,13 +9,13 @@ const timeout = setTimeout(() => {
 
 const runAll = async () => {
   try {
-    await cleanupUsers();
+    await cleanupFiles();
   } catch (err) {
     console.error("❌ Erreur dans cleanupUsers :", err.message || err);
   }
 
   try {
-    await cleanupMissions();
+    await cleanupUsers();
   } catch (err) {
     console.error("❌ Erreur dans cleanupMissions :", err.message || err);
   }
