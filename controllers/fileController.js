@@ -62,7 +62,6 @@ const downloadFile = async (req, res) => {
     const { id, passwordHash } = req.body;
     if (!id) return res.status(400).send("UUID requis.");
 
-    console.log(passwordHash);
     const { data: fileData, error } = await supabase
       .from("files")
       .select("*")
@@ -88,12 +87,23 @@ const downloadFile = async (req, res) => {
       return res.status(500).send("Erreur de téléchargement");
     }
 
-    // Convertir le Blob en ArrayBuffer puis Buffer
+    // Convertir le Blob en Buffer
     const arrayBuffer = await fileBlob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    const originalName = fileData.original_filename || `${fileData.id}.bin`;
+
+    // Nettoyage pour la partie filename=... (ASCII seulement)
+    const asciiFilename = originalName.replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "");
+
+    // Encodage pour filename*= (compatible accents et caractères spéciaux)
+    const utf8Filename = encodeURIComponent(originalName);
+
     res.setHeader("Content-Type", "application/octet-stream");
-   res.setHeader("Content-Disposition", `attachment; filename="${fileData.original_filename || fileData.id}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`
+    );
 
     return res.status(200).send(buffer);
   } catch (err) {
@@ -101,6 +111,8 @@ const downloadFile = async (req, res) => {
     return res.status(500).send("unknown");
   }
 };
+
+
 
 
 
